@@ -77,7 +77,7 @@ export async function injectText(payload: InjectTextPayload): Promise<{ success:
   if (!text) return { success: true };
 
   try {
-    const isAsciiOnly = /^[\x00-\x7F]*$/.test(text);
+    const isAsciiOnly = text.split('').every(c => c.charCodeAt(0) < 128);
     if (forceKeystrokes || (isAsciiOnly && text.length <= 4)) {
       await typeAsKeystrokes(text);
     } else {

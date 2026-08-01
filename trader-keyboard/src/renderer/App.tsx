@@ -7,6 +7,7 @@ import VoiceBar from './components/VoiceBar';
 
 export default function App() {
   const { settings, settingsLoaded, activePanel, setSettings, setForegroundAppName } = useAppStore();
+  const { keyboardLanguage, theme } = settings;
 
   useEffect(() => {
     window.traderKeyboard.settings.get().then(setSettings);
@@ -50,12 +51,12 @@ export default function App() {
         root.classList.toggle('dark', mode === 'dark');
       }
     };
-    if (settingsLoaded) applyTheme(settings.theme);
-  }, [settings.theme, settingsLoaded]);
+    if (settingsLoaded) applyTheme(theme);
+  }, [theme, settingsLoaded]);
 
   useEffect(() => {
-    document.documentElement.dir = settings.keyboardLanguage === 'fa' ? 'rtl' : 'ltr';
-  }, [settings.keyboardLanguage]);
+    document.documentElement.dir = keyboardLanguage === 'fa' ? 'rtl' : 'ltr';
+  }, [keyboardLanguage]);
 
   if (!settingsLoaded) {
     return (
