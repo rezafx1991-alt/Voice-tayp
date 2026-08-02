@@ -16,8 +16,12 @@ import {
 // synchronously, which can freeze the system during installation or on slow
 // machines. Lazy loading defers this until the user actually presses a key.
 
-type NutKeyboard = typeof import('@nut-tree-fork/nut-js').keyboard;
-type NutKey     = typeof import('@nut-tree-fork/nut-js').Key;
+// Use import() return type helpers — Key is a numeric enum (not a class),
+// so we use the module's exported types directly instead of InstanceType<>.
+type NutModule   = typeof import('@nut-tree-fork/nut-js');
+type NutKeyboard = NutModule['keyboard'];
+type NutKey      = NutModule['Key'];           // the enum namespace/object
+type NutKeyValue = NutModule['Key'][keyof NutModule['Key']]; // a single Key value (number)
 
 let _keyboard: NutKeyboard | null = null;
 let _Key: NutKey | null = null;
@@ -45,16 +49,16 @@ async function getNut(): Promise<{ keyboard: NutKeyboard; Key: NutKey } | null> 
 // Key maps (built lazily once Key enum is available)
 // ---------------------------------------------------------------------------
 
-function getModifierMap(Key: NutKey): Record<KeyModifier, InstanceType<NutKey>> {
+function getModifierMap(Key: NutKey): Record<KeyModifier, NutKeyValue> {
   return {
     ctrl:  Key.LeftControl,
     alt:   Key.LeftAlt,
     shift: Key.LeftShift,
     win:   Key.LeftSuper,
-  } as unknown as Record<KeyModifier, InstanceType<NutKey>>;
+  };
 }
 
-function getSpecialKeyMap(Key: NutKey): Record<SpecialKey, InstanceType<NutKey>> {
+function getSpecialKeyMap(Key: NutKey): Record<SpecialKey, NutKeyValue> {
   return {
     Backspace:  Key.Backspace,
     Enter:      Key.Enter,
@@ -68,7 +72,7 @@ function getSpecialKeyMap(Key: NutKey): Record<SpecialKey, InstanceType<NutKey>>
     Escape:     Key.Escape,
     Home:       Key.Home,
     End:        Key.End,
-  } as unknown as Record<SpecialKey, InstanceType<NutKey>>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +90,7 @@ function getSpecialKeyMap(Key: NutKey): Record<SpecialKey, InstanceType<NutKey>>
  *   3) send Ctrl+V to the focused window
  *   4) restore the original clipboard contents
  * This works identically in Notepad, Word, browsers, Telegram, VS Code, etc.
- * ASCII-only single characters (regular typing on the virtual keyboard) are
+ * ASCII-only short strings (regular typing on the virtual keyboard) are
  * still sent as literal keystrokes for lower latency and to preserve native
  * key-repeat/undo behavior in editors.
  */
@@ -137,7 +141,7 @@ export async function injectText(payload: InjectTextPayload): Promise<{ success:
 // Key injection
 // ---------------------------------------------------------------------------
 
-function resolveKey(key: string, Key: NutKey): InstanceType<NutKey> {
+function resolveKey(key: string, Key: NutKey): NutKeyValue {
   const specialMap = getSpecialKeyMap(Key);
   if (key in specialMap) {
     return specialMap[key as SpecialKey];
@@ -145,10 +149,10 @@ function resolveKey(key: string, Key: NutKey): InstanceType<NutKey> {
 
   // Single lowercase letter combo target (Ctrl+C, Ctrl+V, Ctrl+A, Ctrl+Z, ...)
   if (/^[a-z]$/.test(key)) {
-    const letterKeyName = key.toUpperCase() as keyof typeof Key;
-    const mapped = (Key as unknown as Record<string, unknown>)[letterKeyName];
+    const letterKeyName = key.toUpperCase() as keyof NutKey;
+    const mapped = Key[letterKeyName];
     if (typeof mapped === 'number') {
-      return mapped as InstanceType<NutKey>;
+      return mapped as NutKeyValue;
     }
   }
 
@@ -165,7 +169,7 @@ export async function injectKey(payload: InjectKeyPayload): Promise<{ success: b
 
   try {
     const { keyboard, Key } = nut;
-    const modifierMap = getModifierMap(Key);
+    const modifierMap  = getModifierMap(Key);
     const mappedModifiers = modifiers.map((m) => modifierMap[m]);
     const mappedKey = resolveKey(key, Key);
 
