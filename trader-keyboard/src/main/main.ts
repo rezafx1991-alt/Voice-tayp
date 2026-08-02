@@ -95,6 +95,10 @@ function createWindow(): void {
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     logger.error('Renderer process gone:', details);
   });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+    logger.error('Failed to load renderer:', errorCode, errorDescription);
+  });
 }
 
 function saveWindowBounds(): void {

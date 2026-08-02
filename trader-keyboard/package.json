@@ -59,6 +59,10 @@
       "dist-electron/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "node_modules/@nut-tree-fork/**/*",
+      "node_modules/@nut-tree/**/*"
+    ],
     "win": {
       "target": [
         { "target": "nsis", "arch": ["x64"] }
