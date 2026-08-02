@@ -60,24 +60,46 @@ function createWindow(): void {
     },
   });
 
-  // IMPORTANT: this app is a virtual keyboard that types into OTHER
-  // applications. If it ever grabs OS input focus, the very next keypress
-  // would go to the keyboard window itself instead of the user's target
-  // app. setFocusable(false) keeps the window purely clickable-but-non-
-  // focus-stealing on Windows, so key presses always land in the target app.
-  if (process.platform === 'win32') {
-    mainWindow.setFocusable(false);
-    mainWindow.setAlwaysOnTop(settings.alwaysOnTop, 'screen-saver');
-  }
-
   if (VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL);
   } else {
     mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
 
+  // Timeout fallback: if ready-to-show never fires (renderer crash, file not
+  // found, etc.) force the window visible after 5 seconds so the user can
+  // at least see an error instead of a blank tray icon.
+  const showTimeout = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      logger.warn('ready-to-show never fired – forcing window visible');
+      doShow();
+    }
+  }, 5000);
+
+  function doShow(): void {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    // IMPORTANT: this app is a virtual keyboard that types into OTHER
+    // applications. setFocusable(false) must be applied AFTER the window is
+    // first shown; applying it before show() causes Windows to suppress the
+    // window entirely. showInactive() is used so we never steal focus from
+    // the user's target app (Word, Telegram, etc.).
+    if (process.platform === 'win32') {
+      mainWindow.setAlwaysOnTop(settings.alwaysOnTop, 'screen-saver');
+      mainWindow.showInactive();
+      // Delay setFocusable so the window has time to paint before we lock it
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setFocusable(false);
+        }
+      }, 300);
+    } else {
+      mainWindow.show();
+    }
+  }
+
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+    clearTimeout(showTimeout);
+    doShow();
   });
 
   mainWindow.on('close', (event) => {
@@ -116,8 +138,12 @@ function createTray(): void {
     {
       label: 'Show Trader Keyboard',
       click: () => {
-        mainWindow?.show();
-        mainWindow?.focus();
+        if (process.platform === 'win32') {
+          mainWindow?.showInactive();
+        } else {
+          mainWindow?.show();
+          mainWindow?.focus();
+        }
       },
     },
     {
@@ -144,6 +170,8 @@ function createTray(): void {
   tray.on('click', () => {
     if (mainWindow?.isVisible()) {
       mainWindow.hide();
+    } else if (process.platform === 'win32') {
+      mainWindow?.showInactive();
     } else {
       mainWindow?.show();
       mainWindow?.focus();
@@ -154,8 +182,12 @@ function createTray(): void {
 app.on('second-instance', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+    if (process.platform === 'win32') {
+      mainWindow.showInactive();
+    } else {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   }
 });
 
